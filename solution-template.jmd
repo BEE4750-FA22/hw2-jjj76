@@ -1,6 +1,6 @@
 ---
 title: "BEE 4750/5750 Homework 2"
-author: "Your name here (your netID here)"
+author: "Jaden Jeswald (jjj76)"
 date: `j import Dates; Dates.Date(Dates.now())`
 weave_options:
     term: true
@@ -17,21 +17,256 @@ Pkg.instantiate()
 ```
 
 # Problem 1
+dissolved oxygen concentration 
+$0-50 km$ waste stream 1 
 
+``` julia 
+#given 
+
+# m^3/day
+Qr= 100000; #river
+Q1 = 10000; # waste 1
+Q2 = 15000; # waste 2
+
+# mg/L
+DOr = 7.5;
+DO1 = 5;
+DO2 = 5;
+
+CBODr = 5;
+CBOD1 = 50;
+CBOD2 = 45;
+
+NBODr = 5;
+NBOD1 = 35;
+NBOD2 = 35;
+
+U = 6; #km/day
+ka = 0.55; #1/day Reairation rate
+kc = 0.35; #1/day CBOD decay
+kn = 0.25; #1/day NBOD decay
+Cs = 10; # mg/L O2 concentration (saturated) 
+``` 
 ## Problem 1.1
+### If the characteristics of the river inflow and waste discharges are given in the table
+### above, plot the dissolved oxygen concentration in the river from the first waste source
+#### to 50 km downstream.
+``` julia 
+# distance 
+x = 0:1:50; # in km from waste 1
+D0 = zeros(length(x)); CBOD = zeros(length(x)); NBOD = zeros(length(x));
 
+# concentrations after waste 1 in mg/L
+C01_1 = (Qr*DOr + Q1*DO1) / (Qr+Q1); 
+B01_1 = (Qr*CBODr + Q1*CBOD1) / (Qr+Q1); 
+N01_1 = (Qr*NBODr + Q1*NBOD1) / (Qr+Q1); 
+
+
+function DO_conc(Cs, C0, B0, N0, ka, kc, kn, x, U)
+  a1 = exp(-ka*x)
+  a2 = (kc/(ka-kc))*(exp(-kc*x/U)-exp(-ka*x/U))
+  a3 = (kn/(ka-kn))*(exp(-kn*x/U)-exp(-ka*x/U))
+  C = Cs*(1-a1)+C0*(a1-B0)*(a2-N0)*a3
+  return C
+end 
+
+
+# for 0-14 km
+for i in 1:16
+  D0[i] = DO_conc( Cs, C01_1, B01_1, N01_1, ka, kc, kn, x[i], U);
+  CBOD[i] = B01_1*exp(-kc*x[i]/U);
+  NBOD[i] = N01_1*exp(-kn*x[i]/U);
+end 
+
+# for 15-50 km (waste stream 2)
+C02_1 = (DO[16]*(Qr+Q1) + DO2*Q2) / (Qr + Q1 + Q2);
+B02_1 = (CBOD[16]*(Qr+Q1) + CBOD2*Q2) / (Qr + Q1 + Q2);
+N02_1 = (NBOD[16]*(Qr+Q1) + NBOD2*Q2) / (Qr + Q1 + Q2);
+
+
+for i in 16:51
+  D0[i] = DO_conc( Cs, C02_1, B02_1, N02_1, ka, kc, kn, x[i]-15, U);
+end
+
+#plot
+using Plots
+plot(x,DO, title="DO Along Stream", label="Dissolved Oxygen", xlabel="Distance (km)", ylabel="Concentration (mg/L)")
+
+```
 ## Problem 1.2
+### Under the assumptions in Problem 1.1, determine the distance from waste stream 2 it
+### will take for the dissolved oxygen concentration of the river to recover to 6 mg/L if
+### both waste streams are untreated
+
+Based on previous problem, assume DO concentration recovers to 6 mg/L in between 35 and 45 km. 
+``` julia
+val = 6;
+tol = 0.001;
+L = 35;
+R = 45; 
+
+# using bisection
+while R - L > tol 
+  mid = (R+L)/2
+  Do_mid = DO_conc(Cs, C02_1, B02_1, N02_1, ka, kc, kn, mid-15, U);
+  if Do_mid == val  
+    break
+  elseif Do_mod < val 
+    global L = mid
+  else 
+    global R = mid
+  end
+end 
+
+#recovery distance
+recov_dist = (R+L)/2 - 15;
+print(recov_dist)
+```
+Dissolved Oxygen recovers to 6 mg/L at 
 
 ## Problem 1.3
+### What is the minimum level of treatment (% removal of the organic waste) for waste
+### stream 2 that will ensure that the dissolved oxygen concentration never drops below
+### 4 mg/L, assuming that waste stream 1 remains untreated?
+``` julia
+DO_3 = DO[1:51];
+treatment = 0;
+while minimum(DO_3) < 4
+  global treatment = treatment + 0.001; 
+
+  #waste 2 
+  CBOD2_3 = (1-treatment) * CBOD2;
+  NBOD2_3 = (1-treatment) * NBOD2;
+
+  # river content after waste 2
+  B02_3 = (CBOD[16]*(Qr+Q1) + CBOD2_3*Q2) / (Qr+Q1+Q2);
+  N02_3 = (NBOD[16]*(Qr+Q1) + NBOD2_3*Q2) / (Qr+Q1+Q2);
+
+  #DO after river and waste 2
+  for i in 16:51
+    DO_3[i] = DO_conc(Cs, C02_1, B02_3, N02_3, ka, kc, kn, x[i]-15, U)
+  end
+end
+
+print(treatment)
+
+```
+
+Treatment level of Waste 2 to keep DO conc above 4 mg/L is 
 
 ## Problem 1.4
+### If both waste streams are treated equally, what is the minimum level of treatment (% removal) of the two sources required to ensure that the dissolved oxygen concentration
+### never drops below 4 mg/L?
+``` julia
+DO_4 = DO[1:51];
+treatment2 = 0;
+while minimum(DO_4) < 4
+  global treatment2 = treatment2 + 0.001; 
 
+#waste 1 
+  CBOD1_4 = (1-treatment2) * CBOD1;
+  NBOD1_4 = (1-treatment2) * NBOD1;
+
+  # river content after waste 1
+  B01_4 = (Qr*CBODr + Q1*CBOD1_4) / (Qr+Q1);
+  N01_4 = (Qr*NBODr + Q1*NBOD1_4) / (Qr+Q1);
+
+# for 0-14 km
+  for i in 16:51
+    DO_4[i] = DO_conc(Cs, C01_1, B01_4, N01_4, ka, kc, kn, x[i], U)
+  end
+
+  #waste 2 
+  CBOD2_4 = (1-treatment2) * CBOD2;
+  NBOD2_4 = (1-treatment2) * NBOD2;
+
+  # river content after waste 2
+  CBOD_15t = B01_4*exp(-kc*15/U);
+  NBOD_15t = N01_4*exp(-kn*15/U);
+  C02_4 = (DO_4[16]*(Qr+Q1) + DO2*Q2) / (Qr+Q1+Q2);
+  B02_4 = (CBOD_15t*(Qr+Q1) + CBOD2_3*Q2) / (Qr+Q1+Q2);
+  N02_4 = (NBOD_15t*(Qr+Q1) + NBOD2_3*Q2) / (Qr+Q1+Q2);
+
+  #DO after river and waste 2
+  for i in 16:51
+    DO_4[i] = DO_conc(Cs, C02_4, B02_4, N02_4, ka, kc, kn, x[i]-15, U)
+  end
+end
+
+
+print(treatment2)
+```
+
+minimum level of treatment to both streams is 
 ## Problem 1.5
+### Suppose you were responsible for waste treatment along the river, with a regulatory
+### mandate to keep the dissolved oxygen concentration above 4 mg/L. Discuss whether
+### you’d opt to treat waste stream 2 alone or both waste streams equally. What other
+### information might you need to make a conclusion, if any
+``` julia
 
+```
 ## Problem 1.6
+### Suppose now that the CBOD and NBOD values of the river inflow are uncertain. Suppose that your estimates of CBOD vary uniformly between 4 and 7 mg/L, and NBOD
+### estimates vary uniformly between 3 and 8 mg/L. If you assume these values are independent, what is the probability that the strategy you identified in Problem 1.5 will
+### fail to keep the dissolved oxygen concentration above 4 mg/L?
+``` julia
+fails = 0; 
+
+treatment = 0.117;
+CBOD2_6 = (1-treatment)*CBOD2;
+NBOD2_6 = (1-treatment)*NBOD2;
+
+# conc range in river
+CBOD_range = 4:0.01:7;
+NBOD_range = 3:0.01:8;
+
+for i in 1:length(CBOD_range)
+  for j in 1:length(NBOD_range)
+    CBOD_6 = CBOD_range[i];
+    NBOD_6 = NBOD_range[j];
+    DO_6 = zeros(length(x));
+
+    B01_6 = (Qr*CBOD_6 + Q1*CBOD1) / (Qr+Q1);
+    N01_6 = (Qr*NBOD_6 + Q1*NBOD1) / (Qr+Q1);
+
+    # for 0-14 km
+    for i in 1:16
+      DO_6[i] = DO_conc(Cs, C01_1, B01_6, N01_6, ka, kc, kn, x[i], U);
+    end
+
+    # for 15-50 km
+    CBOD2_river = B01_6*exp(-kc*15/U);
+    NBOD2_river = N01_6*exp(-kn*15/U);
+    C02_6 = (DO_6[16]*(Qr+Q1) + DO2*Q2) / (Qr+Q1+Q2);
+    B02_6 = (CBOD2_river*(Qr+Q1) + CBOD2_6*Q2) / (Qr+Q1+Q2);
+    N02_6 = (NBOD2_river*(Qr+Q1) + NBOD2_6*Q2) / (Qr+Q1+Q2);
+
+    for i in 16:51
+      DO_6[i] = DO_conc(Cs, C02_6, B02_6, N02_6, ka, kc, kn, x[i], U);
+    end
+
+    if minimum(DO_6) < 4
+      global fails = fails + 1;
+    end
+  end
+end
+
+#probability
+prob = fails/length(CBOD_range)*length(NBOD_range));
+print(prob)
+
+```
+
+the probability of the strategy is 
+
 
 ## Problem 1.7
-
+### Now suppose that the CBOD and NBOD values are correlated: specifically, they have
+### a correlation coefficient of 0.7. How does that impact the probability of maintaining a dissolved oxygen concentration above 4 mg/L under the treatment strategy
+### from Problems 1.5? The solution template includes a code block defining a function
+### sample_correlated_uniform() that you can use to produce correlated uniform
+### variates.
 ```julia; echo=false
 # This block will not show up in compiled output.
 
@@ -50,8 +285,61 @@ function sample_correlated_uniform(n, a, b, corr_coef=0.7)
 end
 ```
 
-## Problem 1.8
+``` julia
+fails_7 = 0;
+n = 10000;
+
+treatment = 0.117;
+CBOD2_7 = (1-treatment)*CBOD2;
+NBOD2_7 = (1-treatment)*NBOD2;
+
+samples = sample_correlated_uniform(n, [4,7], [3,8], 0.7);
+
+for i in 1:n
+  
+  CBOD_7 = samples[i,1];
+  NBOD_7 = samples[i,2];
+  DO_7 = zeros(length(x));
+
+  B01_7 = (Qr*CBOD_7 + Q1*CBOD1) / (Qr+Q1);
+  N01_7 = (Qr*NBOD_7 + Q1*NBOD1) / (Qr+Q1);
+
+    # for 0-14 km
+    for i in 1:16
+      DO_7[i] = DO_conc(Cs, C01_1, B01_7, N01_7, ka, kc, kn, x[i], U);
+    end
+
+    # for 15-50 km
+    CBOD2_river = B01_7*exp(-kc*15/U);
+    NBOD2_river = N01_7*exp(-kn*15/U);
+    C02_7 = (DO_7[16]*(Qr+Q1) + DO2*Q2) / (Qr+Q1+Q2);
+    B02_7 = (CBOD2_river*(Qr+Q1) + CBOD2_7*Q2) / (Qr+Q1+Q2);
+    N02_7 = (NBOD2_river*(Qr+Q1) + NBOD2_7*Q2) / (Qr+Q1+Q2);
+
+    for i in 16:51
+      DO_7[i] = DO_conc(Cs, C02_7, B02_7, N02_7, ka, kc, kn, x[i], U);
+    end
+
+    if minimum(DO_7) < 4
+      global fails_7 = fails_7 + 1;
+    end
+end
+
+
+#probability
+prob_7 = fails/length(CBOD_range)*length(NBOD_range));
+print(prob_7)
 
 ```
 
+the probability of the strategy is 
+
+## Problem 1.8
+### Discuss how the presence of uncertainty and dependence between variables might
+### affect your decision-making process. Would you stick with the same strategy as in
+### Problem 1.5, or find a new strategy? What other information would you need, if any?
+```
+
 # References
+Had assistance from Akanksha Sriavastava 
+Used slides on Canva
