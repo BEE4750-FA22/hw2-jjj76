@@ -17,10 +17,11 @@ Pkg.instantiate()
 ```
 
 # Problem 1
-dissolved oxygen concentration 
-$0-50 km$ waste stream 1 
-
-```julia 
+## Problem 1.1
+### If the characteristics of the river inflow and waste discharges are given in the table
+### above, plot the dissolved oxygen concentration in the river from the first waste source
+#### to 50 km downstream.
+```julia
 #given 
 # m^3/day
 Qr= 100000; #river
@@ -44,35 +45,30 @@ U = 6; #km/day
 ka = 0.55; #1/day Reairation rate
 kc = 0.35; #1/day CBOD decay
 kn = 0.25; #1/day NBOD decay
-Cs = 10; # mg/L O2 concentration (saturated) 
-``` 
-## Problem 1.1
-### If the characteristics of the river inflow and waste discharges are given in the table
-### above, plot the dissolved oxygen concentration in the river from the first waste source
-#### to 50 km downstream.
-```julia 
+Cs = 10; # mg/L O2 concentration (saturated)
+
 # distance 
 x = 0:1:50; # in km from waste 1
-DO = zeros(length(x)); CBOD = zeros(length(x)); NBOD = zeros(length(x));
+DO = zeros(length(x)); 
+CBOD = zeros(length(x)); 
+NBOD = zeros(length(x));
 
 # concentrations after waste 1 in mg/L
 C01_1 = (Qr*DOr + Q1*DO1) / (Qr+Q1); 
 B01_1 = (Qr*CBODr + Q1*CBOD1) / (Qr+Q1); 
 N01_1 = (Qr*NBODr + Q1*NBOD1) / (Qr+Q1); 
 
-
 function DO_conc(Cs, C0, B0, N0, ka, kc, kn, x, U)
-  a1 = exp(-ka*x)
+  a1 = exp(-ka*x/U)
   a2 = (kc/(ka-kc))*(exp(-kc*x/U)-exp(-ka*x/U))
   a3 = (kn/(ka-kn))*(exp(-kn*x/U)-exp(-ka*x/U))
-  C = Cs*(1-a1)+C0*(a1-B0)*(a2-N0)*a3
+  C = Cs*(1-a1)+C0*a1-B0*a2-N0*a3
   return C
 end 
 
-
 # for 0-14 km
 for i in 1:16
-  DO[i] = DO_conc( Cs, C01_1, B01_1, N01_1, ka, kc, kn, x[i], U);
+  DO[i] = DO_conc(Cs, C01_1, B01_1, N01_1, ka, kc, kn, x[i], U);
   CBOD[i] = B01_1*exp(-kc*x[i]/U);
   NBOD[i] = N01_1*exp(-kn*x[i]/U);
 end 
@@ -82,21 +78,18 @@ C02_1 = (DO[16]*(Qr+Q1) + DO2*Q2) / (Qr + Q1 + Q2);
 B02_1 = (CBOD[16]*(Qr+Q1) + CBOD2*Q2) / (Qr + Q1 + Q2);
 N02_1 = (NBOD[16]*(Qr+Q1) + NBOD2*Q2) / (Qr + Q1 + Q2);
 
-
 for i in 16:51
-  DO[i] = DO_conc( Cs, C02_1, B02_1, N02_1, ka, kc, kn, x[i]-15, U);
+  DO[i] = DO_conc(Cs, C02_1, B02_1, N02_1, ka, kc, kn, x[i]-15, U);
 end
 
 #plot
 using Plots
 plot(x,DO, title="DO Along Stream", label="Dissolved Oxygen", xlabel="Distance (km)", ylabel="Concentration (mg/L)")
-
 ```
 ## Problem 1.2
 ### Under the assumptions in Problem 1.1, determine the distance from waste stream 2 it
 ### will take for the dissolved oxygen concentration of the river to recover to 6 mg/L if
 ### both waste streams are untreated
-
 Based on previous problem, assume DO concentration recovers to 6 mg/L in between 35 and 45 km. 
 ```julia
 val = 6;
@@ -121,8 +114,7 @@ end
 recov_dist = (R+L)/2 - 15;
 print(recov_dist)
 ```
-Dissolved Oxygen recovers to 6 mg/L at ~41.2 km.
-26.2 km from waste 2. 
+Dissolved Oxygen recovers to 6 mg/L at 26.1624 km.
 
 ## Problem 1.3
 ### What is the minimum level of treatment (% removal of the organic waste) for waste
@@ -132,28 +124,24 @@ start at 0% and increase by 0.1%
 ```julia
 DO_3 = DO[1:51];
 treatment = 0;
-while minimum(DO_3) < 4
-  global treatment = treatment + 0.001; 
+  while minimum(DO_3) < 4
+    global treatment = treatment + 0.001; 
+    #waste 2 
+    CBOD2_3 = (1-treatment) * CBOD2;
+    NBOD2_3 = (1-treatment) * NBOD2;
 
-  #waste 2 
-  CBOD2_3 = (1-treatment) * CBOD2;
-  NBOD2_3 = (1-treatment) * NBOD2;
-
-  # river content after waste 2
-  B02_3 = (CBOD[16]*(Qr+Q1) + CBOD2_3*Q2) / (Qr+Q1+Q2);
-  N02_3 = (NBOD[16]*(Qr+Q1) + NBOD2_3*Q2) / (Qr+Q1+Q2);
-
-  #DO after river and waste 2
+    # river content after waste 2
+    B02_3 = (CBOD[16]*(Qr+Q1) + CBOD2_3*Q2) / (Qr+Q1+Q2);
+    N02_3 = (NBOD[16]*(Qr+Q1) + NBOD2_3*Q2) / (Qr+Q1+Q2);
+  
+    #DO after river and waste 2
   for i in 16:51
-    DO_3[i] = DO_conc(Cs, C02_1, B02_3, N02_3, ka, kc, kn, x[i]-15, U)
+      DO_3[i] = DO_conc(Cs, C02_1, B02_3, N02_3, ka, kc, kn, x[i]-15, U)
   end
-end
-
+  end
 print(treatment)
-
 ```
-
-Treatment level of Waste 2 to keep DO conc above 4 mg/L is 11.7%
+Treatment level of Waste 2 to keep DO conc above 4 mg/L is 11.7% 
 
 ## Problem 1.4
 ### If both waste streams are treated equally, what is the minimum level of treatment (% removal) of the two sources required to ensure that the dissolved oxygen concentration
@@ -173,7 +161,7 @@ while minimum(DO_4) < 4
   N01_4 = (Qr*NBODr + Q1*NBOD1_4) / (Qr+Q1);
 
 # for 0-14 km
-  for i in 16:51
+  for i in 1:16
     DO_4[i] = DO_conc(Cs, C01_1, B01_4, N01_4, ka, kc, kn, x[i], U)
   end
 
@@ -185,19 +173,16 @@ while minimum(DO_4) < 4
   CBOD_15t = B01_4*exp(-kc*15/U);
   NBOD_15t = N01_4*exp(-kn*15/U);
   C02_4 = (DO_4[16]*(Qr+Q1) + DO2*Q2) / (Qr+Q1+Q2);
-  B02_4 = (CBOD_15t*(Qr+Q1) + CBOD2_3*Q2) / (Qr+Q1+Q2);
-  N02_4 = (NBOD_15t*(Qr+Q1) + NBOD2_3*Q2) / (Qr+Q1+Q2);
+  B02_4 = (CBOD_15t*(Qr+Q1) + CBOD2_4*Q2) / (Qr+Q1+Q2);
+  N02_4 = (NBOD_15t*(Qr+Q1) + NBOD2_4*Q2) / (Qr+Q1+Q2);
 
   #DO after river and waste 2
   for i in 16:51
     DO_4[i] = DO_conc(Cs, C02_4, B02_4, N02_4, ka, kc, kn, x[i]-15, U)
   end
 end
-
-
 print(treatment2)
 ```
-
 minimum level of treatment to both streams is 6.6%
 ## Problem 1.5
 ### Suppose you were responsible for waste treatment along the river, with a regulatory
@@ -207,14 +192,12 @@ minimum level of treatment to both streams is 6.6%
 For 1.3 and 1.4, we can treat waste 2 with 11.7% organics removal but if we want to treat waste 1 and waste 2
 at the same time we need to account for 6.6% removal in both. Assume a linear relationship 
 we should treat waste 2 only. We would only pay for 11.7% removal instead of 13.2% total. 
-
 This could be inaccurate if not a linear relationship or if the cost is not a direct reflection of the % removal total. 
 
 ## Problem 1.6
 ### Suppose now that the CBOD and NBOD values of the river inflow are uncertain. Suppose that your estimates of CBOD vary uniformly between 4 and 7 mg/L, and NBOD
 ### estimates vary uniformly between 3 and 8 mg/L. If you assume these values are independent, what is the probability that the strategy you identified in Problem 1.5 will
 ### fail to keep the dissolved oxygen concentration above 4 mg/L?
-
 Chose just to treat waste 2. Redo 1.1 with treatment and test over (4-7 mg/L) CBOD and (3-8 mg/L) NBOD. 
 ```julia
 fails = 0; 
@@ -259,13 +242,10 @@ for i in 1:length(CBOD_range)
 end
 
 #probability
-prob = fails/length(CBOD_range)*length(NBOD_range));
+prob = fails/(length(CBOD_range)*length(NBOD_range));
 print(prob)
-
 ```
-
-the probability of the strategy failing is 11%
-
+the probability of the strategy failing is 10.86%
 
 ## Problem 1.7
 ### Now suppose that the CBOD and NBOD values are correlated: specifically, they have
@@ -273,7 +253,6 @@ the probability of the strategy failing is 11%
 ### from Problems 1.5? The solution template includes a code block defining a function
 ### sample_correlated_uniform() that you can use to produce correlated uniform
 ### variates.
-
 use given function (sample_correlated_uniform) to randomly select 10,000 samples and redo 1.6 calculations
 ```julia; echo=false
 # This block will not show up in compiled output.
@@ -335,12 +314,17 @@ end
 
 
 #probability
-prob_7 = fails/length(CBOD_range)*length(NBOD_range));
+prob_7 = fails_7/n;
 print(prob_7)
-
 ```
-
-the probability of the strategy failing is about 20% after several runs
+the probability of the strategy failing after 5 runs is 
+run 1 = 0.1959
+run 2 = 0.1946
+run 3 = 0.195
+run 4 = 0.2033
+run 5 = 0.1882
+average of 5 = 0.1954
+or 19.54%
 
 ## Problem 1.8
 ### Discuss how the presence of uncertainty and dependence between variables might
@@ -348,10 +332,10 @@ the probability of the strategy failing is about 20% after several runs
 ### Problem 1.5, or find a new strategy? What other information would you need, if any?
 Uncertainty makes the strategy of just choosing waste 2 organic removal fail where it would have met the standard. 
 The relationship between CBOD and NBOC increased probability of failure. 
-
 I would change straetgies and would address uncertainity with a range of confidence. Here I could analyze my outputs with mean and standard deviations to make sure it was accurate. 
-```
 
 # References
 Had assistance from Akanksha Sriavastava 
 Used slides on Canva
+Used Ed Discussion
+Had 1-on-1 assistance from Chloe 
